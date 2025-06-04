@@ -11,7 +11,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-# Add your full list of Burger Singh URLs here
 STORE_URLS = [
     "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-ganeshguri-guwahati-579784",
     "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-stational-club-durga-mandir-purnea-purnea-698848",
@@ -20,14 +19,13 @@ STORE_URLS = [
 
 def setup_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Headless mode for Streamlit cloud
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
     try:
         driver = webdriver.Chrome(options=chrome_options)
         return driver
@@ -55,7 +53,6 @@ def scrape_single_store(driver, url):
         driver.get(url)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
 
-        # Dismiss cookie or consent popup if any
         try:
             WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Accept')]"))
@@ -63,8 +60,8 @@ def scrape_single_store(driver, url):
         except (TimeoutException, NoSuchElementException):
             pass
 
-        driver.execute_script("window.scrollTo(0, 1000);")  # Scroll down to load offers
-        time.sleep(3)  # Wait for content to load
+        driver.execute_script("window.scrollTo(0, 1000);")
+        time.sleep(3)
 
         offers = []
 
@@ -114,8 +111,8 @@ def scrape_single_store(driver, url):
                 offers.append({
                     'store_name': get_store_name_from_url(url),
                     'store_url': url,
-                    'title': title,
-                    'description': description
+                    'discounts': title,
+                    'code': description
                 })
             except:
                 continue
@@ -130,7 +127,7 @@ def remove_duplicates(offers):
     seen = set()
     unique_offers = []
     for offer in offers:
-        key = (offer['store_name'], offer['title'], offer['description'])
+        key = (offer['store_name'], offer['discounts'], offer['code'])
         if key not in seen:
             seen.add(key)
             unique_offers.append(offer)
@@ -158,7 +155,7 @@ def scrape_all_stores(progress_text, progress_bar):
 
 def save_offers_to_csv(offers):
     output = io.StringIO()
-    fieldnames = ['store_name', 'store_url', 'title', 'description']
+    fieldnames = ['Store Name', 'Store URL', 'Discounts', 'CODE']
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
 
@@ -166,17 +163,39 @@ def save_offers_to_csv(offers):
     for offer in offers:
         row = {}
         if last_store != offer['store_name']:
-            row['store_name'] = offer['store_name']
-            row['store_url'] = offer['store_url']
+            row['Store Name'] = offer['store_name']
+            row['Store URL'] = offer['store_url']
             last_store = offer['store_name']
         else:
-            row['store_name'] = ''
-            row['store_url'] = ''
-        row['title'] = offer['title']
-        row['description'] = offer['description']
+            row['Store Name'] = ''
+            row['Store URL'] = ''
+        row['Discounts'] = offer['discounts']
+        row['CODE'] = offer['code']
         writer.writerow(row)
 
     return output.getvalue()
+
+def prepare_display_dataframe(offers):
+    # Show store name & URL only once per store for display
+    rows = []
+    last_store = None
+    for offer in offers:
+        if last_store != offer['store_name']:
+            rows.append({
+                'Store Name': offer['store_name'],
+                'Store URL': offer['store_url'],
+                'Discounts': offer['discounts'],
+                'CODE': offer['code']
+            })
+            last_store = offer['store_name']
+        else:
+            rows.append({
+                'Store Name': '',
+                'Store URL': '',
+                'Discounts': offer['discounts'],
+                'CODE': offer['code']
+            })
+    return pd.DataFrame(rows)
 
 def main():
     st.title("🍔 Burger Singh Offers Scraper")
@@ -190,7 +209,7 @@ def main():
 
         if offers:
             st.success(f"Scraping completed! Total unique offers found: {len(offers)}")
-            df = pd.DataFrame(offers)
+            df = prepare_display_dataframe(offers)
             st.dataframe(df)
 
             csv_data = save_offers_to_csv(offers)
