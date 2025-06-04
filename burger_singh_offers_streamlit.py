@@ -6,43 +6,34 @@ from datetime import datetime
 import time
 import random
 import pandas as pd
-from selenium import webdriver
+import undetected_chromedriver.v2 as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-# Complete list of Burger Singh store URLs (truncated; add full list)
+# Complete list of Burger Singh store URLs
 STORE_URLS = [
     "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-ganeshguri-guwahati-579784",
     "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-stational-club-durga-mandir-purnea-purnea-698848",
-    # add more URLs as needed
+    # Add more as needed
 ]
 
 def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--headless")  # Run headless in Streamlit
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-    # Use the path to Streamlit Cloud's Chromium and ChromeDriver
-    chrome_bin_path = "/usr/bin/chromium-browser"
-    chromedriver_path = "/usr/bin/chromedriver"
-
-    chrome_options.binary_location = chrome_bin_path
-    service = Service(chromedriver_path)
-
     try:
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        options = uc.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                             "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+        driver = uc.Chrome(options=options)
         return driver
     except Exception as e:
-        st.error(f"Error setting up Chrome driver: {str(e)}")
+        st.error(f"Error setting up undetected Chrome driver: {str(e)}")
         return None
 
 def get_store_name_from_url(url):
@@ -64,10 +55,13 @@ def scrape_single_store(driver, url):
     try:
         driver.get(url)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
+
         try:
-            WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Accept')]"))).click()
+            WebDriverWait(driver, 5).until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(text(), 'Accept')]"))).click()
         except (TimeoutException, NoSuchElementException):
             pass
+
         driver.execute_script("window.scrollTo(0, 1000);")
         time.sleep(3)
 
@@ -99,7 +93,7 @@ def scrape_single_store(driver, url):
                 element_text = element.text.strip()
                 if not element_text or len(element_text) < 3:
                     continue
-                
+
                 title_element = None
                 desc_element = None
                 try:
@@ -110,9 +104,10 @@ def scrape_single_store(driver, url):
                     desc_element = element.find_element(By.CSS_SELECTOR, "div[class*='desc'], span[class*='code']")
                 except:
                     pass
-                
+
                 title = title_element.text.strip() if title_element else element_text.split('\n')[0]
-                description = desc_element.text.strip() if desc_element else (element_text.split('\n')[1] if '\n' in element_text else 'N/A')
+                description = desc_element.text.strip() if desc_element else (
+                    element_text.split('\n')[1] if '\n' in element_text else 'N/A')
 
                 offers.append({
                     'store_name': get_store_name_from_url(url),
@@ -124,7 +119,7 @@ def scrape_single_store(driver, url):
                 continue
 
         return offers
-    
+
     except Exception as e:
         st.error(f"Error processing store {url}: {str(e)}")
         return []
@@ -142,7 +137,7 @@ def scrape_all_stores(progress_text, progress_bar):
         all_offers.extend(offers)
         progress_text.text(f"Processed {i}/{total_stores} stores. Offers found: {len(all_offers)}")
         progress_bar.progress(i / total_stores)
-        time.sleep(random.uniform(2, 5))
+        time.sleep(random.uniform(2, 4))
 
     driver.quit()
     return all_offers
@@ -185,10 +180,10 @@ def main():
             st.dataframe(df)
 
             csv_data = save_offers_to_csv(offers)
-            st.download_button(label="Download CSV", data=csv_data, file_name="burger_singh_offers.csv", mime="text/csv")
+            st.download_button(label="Download CSV", data=csv_data,
+                               file_name="burger_singh_offers.csv", mime="text/csv")
         else:
             st.warning("No offers found or scraping failed.")
 
 if __name__ == "__main__":
     main()
-
