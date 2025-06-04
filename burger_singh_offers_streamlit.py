@@ -13,8 +13,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # Add your full list of Burger Singh URLs here
 STORE_URLS = [
-    "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-ganeshguri-guwahati-579784",
-    "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-stational-club-durga-mandir-purnea-purnea-698848",
+    "https://www.swiggy.com/city/kolkata/burger-singh-big-punjabi-burgers-jyangra-chinar-park-rest739703",
     "https://www.swiggy.com/city/guwahati/burger-singh-big-punjabi-burgers-city-center-mall-christian-basti-rest579784",
 ]
 
