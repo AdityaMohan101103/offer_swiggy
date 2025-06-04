@@ -11,11 +11,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
+# Add Burger Singh store URLs here
 STORE_URLS = [
-    "https://www.swiggy.com/city/guwahati/burger-singh-big-punjabi-burgers-city-center-mall-christian-basti-rest579784",
-    "https://www.swiggy.com/city/gonda/burger-singh-big-punjabi-burgers-kachehari-road-malviya-nagar-lbs-chauraha-rest966602",
+    "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-ganeshguri-guwahati-579784",
+    "https://www.swiggy.com/restaurants/burger-singh-big-punjabi-burgers-stational-club-durga-mandir-purnea-purnea-698848",
     # Add more URLs as needed
-    "https://www.swiggy.com/city/kolkata/burger-singh-big-punjabi-burgers-jyangra-chinar-park-rest739703",
 ]
 
 def setup_driver():
@@ -25,7 +25,7 @@ def setup_driver():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36")
+    chrome_options.add_argument("--user-agent=Mozilla/5.0")
 
     try:
         driver = webdriver.Chrome(options=chrome_options)
@@ -37,10 +37,9 @@ def setup_driver():
 def get_store_name_from_url(url):
     try:
         if '/restaurants/' in url:
-            parts = url.split('/restaurants/')[1].split('-rest')[0]
-            return parts.replace('-', ' ').title()
-        else:
-            return url.split('/')[-1]
+            parts = url.split('/restaurants/')[1].split('-')
+            return ' '.join(parts[:-1]).title()
+        return url
     except:
         return "Unknown Store"
 
@@ -60,15 +59,29 @@ def scrape_single_store(driver, url):
         time.sleep(3)
 
         offers = []
+
         offer_boxes = driver.find_elements(By.CSS_SELECTOR, "div[data-testid^='offer-card-container']")
+        if not offer_boxes:
+            offer_boxes = driver.find_elements(By.CSS_SELECTOR, "div.sc-dBmzty")  # fallback for some designs
 
         for box in offer_boxes:
             try:
-                texts = box.find_elements(By.CSS_SELECTOR, "div.sc-aXZVg")
-                if len(texts) >= 1:
-                    title = texts[0].text.strip()
-                    code = texts[1].text.strip() if len(texts) > 1 else "N/A"
+                # Try different paths to get offer and code
+                title = ""
+                code = ""
 
+                try:
+                    title = box.find_element(By.CSS_SELECTOR, "div.sc-aXZVg.hsuIwO").text.strip()
+                except:
+                    title = box.text.split('\n')[0].strip()
+
+                try:
+                    code = box.find_element(By.CSS_SELECTOR, "div.sc-aXZVg.foYDCM").text.strip()
+                except:
+                    lines = box.text.strip().split('\n')
+                    code = lines[1] if len(lines) > 1 else "N/A"
+
+                if title and code:
                     offers.append({
                         'store_name': get_store_name_from_url(url),
                         'store_url': url,
@@ -126,7 +139,7 @@ def save_offers_to_csv(offers):
 
 def main():
     st.title("🍔 Burger Singh Offers Scraper")
-    st.write("Scrape current offers from Burger Singh restaurant pages on Swiggy.")
+    st.write("Scrape current offers (including BOGO) from Swiggy restaurant pages.")
 
     if st.button("Start Scraping"):
         progress_text = st.empty()
@@ -140,7 +153,7 @@ def main():
             st.dataframe(df)
 
             csv_data = save_offers_to_csv(offers)
-            st.download_button(label="Download CSV", data=csv_data, file_name="burger_singh_offers.csv", mime="text/csv")
+            st.download_button(label="📥 Download CSV", data=csv_data, file_name="burger_singh_offers.csv", mime="text/csv")
         else:
             st.warning("No offers found or scraping failed.")
 
