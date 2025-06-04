@@ -28,7 +28,6 @@ def setup_driver():
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-    # On Streamlit Cloud, chromedriver & chromium are preinstalled at default PATH locations
     try:
         driver = webdriver.Chrome(options=chrome_options)
         return driver
@@ -127,6 +126,16 @@ def scrape_single_store(driver, url):
         st.error(f"Error processing store {url}: {str(e)}")
         return []
 
+def remove_duplicates(offers):
+    seen = set()
+    unique_offers = []
+    for offer in offers:
+        key = (offer['store_name'], offer['title'], offer['description'])
+        if key not in seen:
+            seen.add(key)
+            unique_offers.append(offer)
+    return unique_offers
+
 def scrape_all_stores(progress_text, progress_bar):
     driver = setup_driver()
     if not driver:
@@ -143,6 +152,8 @@ def scrape_all_stores(progress_text, progress_bar):
         time.sleep(random.uniform(2, 5))
 
     driver.quit()
+
+    all_offers = remove_duplicates(all_offers)
     return all_offers
 
 def save_offers_to_csv(offers):
@@ -178,7 +189,7 @@ def main():
         offers = scrape_all_stores(progress_text, progress_bar)
 
         if offers:
-            st.success(f"Scraping completed! Total offers found: {len(offers)}")
+            st.success(f"Scraping completed! Total unique offers found: {len(offers)}")
             df = pd.DataFrame(offers)
             st.dataframe(df)
 
